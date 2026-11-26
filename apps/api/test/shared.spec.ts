@@ -6,6 +6,7 @@ describe('shared pure functions', () => {
     expect(estimateWaitMin({ peopleAhead: 6, avgServiceMin: 8, countersOpen: 2 })).toBe(24);
     expect(estimateWaitMin({ peopleAhead: 0, avgServiceMin: 8, countersOpen: 2 })).toBe(0);
     expect(estimateWaitMin({ peopleAhead: 3, avgServiceMin: 8, countersOpen: 0 })).toBe(24); // no counters open: single lane
+    expect(estimateWaitMin({ peopleAhead: 5, avgServiceMin: 5, countersOpen: -1 })).toBe(25); // handles invalid/negative counters
   });
   it('etaRange brackets the estimate', () => {
     const { low, high } = etaRange(12);
@@ -37,5 +38,11 @@ describe('shared pure functions', () => {
     const out = fairOrder(rows);
     // Up to 3 earlier regulars go before a priority token; priority never starves regulars.
     expect(out.map((r) => r.id)).toEqual(['r1', 'r2', 'r3', 'p1', 'r4', 'p2']);
+  });
+  it('fairOrder handles empty and all-priority edge cases', () => {
+    expect(fairOrder([])).toEqual([]);
+    const mk = (id: string, priority: 'normal' | 'priority', i: number) => ({ id, priority, createdAt: new Date(1000 + i) });
+    const allPriority = [mk('p1', 'priority', 1), mk('p2', 'priority', 2)];
+    expect(fairOrder(allPriority).map(r => r.id)).toEqual(['p1', 'p2']);
   });
 });
