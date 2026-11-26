@@ -1,0 +1,36 @@
+{
+  "app": { "name": "QueuePass", "tagline": "No standing in line — your time, your token", "back": "Back", "loading": "Loading…" },
+  "nav": { "join": "Get a token", "counter": "Counter", "manager": "Manager", "login": "Log in", "logout": "Log out", "tv": "TV display", "kiosk": "Kiosk" },
+  "join": {
+    "title": "Get a token", "subtitle": "Pick a branch and a service — enter your phone and your token is ready.",
+    "branch": "Branch", "service": "Service", "phone": "Mobile number", "phonePh": "01XXXXXXXXX", "name": "Name (optional)", "namePh": "Your name",
+    "priority": "Priority", "normal": "Normal", "priorityOpt": "Priority (senior / disabled / urgent)",
+    "submit": "Get token", "taking": "Getting your token…", "noBranches": "No branch is open right now.",
+    "rateLimit": "This number already has 3 tokens at this branch today."
+  },
+  "token": {
+    "title": "Your token", "ahead": "{n} people ahead of you", "youAreNext": "You are next",
+    "eta": "Estimated wait", "etaRange": "{low}–{high} min", "countersOpen": "{n} counters open",
+    "status": { "waiting": "Waiting", "called": "Called", "serving": "Serving", "completed": "Completed", "no_show": "No-show", "cancelled": "Cancelled", "expired": "Expired" },
+    "calledBanner": "Your token has been called — please go to {counter}.",
+    "leave": "Leave the queue", "left": "You have left the queue.", "leaveConfirm": "Are you sure you want to leave the queue?",
+    "refresh": "Latest update", "linkHint": "Keep this page open — your number shows here even if the SMS does not arrive."
+  },
+  "display": { "nowServing": "Now serving", "upNext": "Up next", "counter": "Counter", "noService": "No counter is open right now", "soundOn": "Enable sound", "soundOnHint": "Enable sound to hear announcements" },
+  "counter": {
+    "title": "Counter", "pickCounter": "Pick a counter", "branch": "Branch",
+    "callNext": "Call next", "complete": "Complete", "noShow": "No-show", "recall": "Recall",
+    "current": "Current token", "none": "No token called yet", "waiting": "Waiting", "queue": "Queue",
+    "confirmNoShow": "Mark this token as a no-show?", "break": "Break", "open": "Open", "close": "Close"
+  },
+  "manager": {
+    "title": "Manager", "overview": "Overview", "services": "Services", "counters": "Counters", "hours": "Working hours",
+    "appointments": "Appointments", "analytics": "Analytics", "sms": "SMS", "audit": "Audit log", "billing": "Billing", "staff": "Staff", "onboarding": "New branch",
+    "waiting": "Waiting", "served": "Served", "issued": "Tokens issued", "noShow": "No-show",
+    "avgWait": "Avg wait", "avgService": "Avg service time", "noShowRate": "No-show rate",
+    "peakHours": "Busy hours", "byService": "By service", "exportCsv": "Download CSV", "sweep": "Close the day",
+    "sweepConfirm": "Closing the day expires all open tokens. Continue?", "swept": "Day closed — {n} tokens expired."
+  },
+  "login": { "title": "Log in", "email": "Email", "password": "Password", "pin": "4-digit PIN", "submit": "Log in", "pinLogin": "Log in with PIN", "passwordLogin": "Log in with password", "bad": "Wrong email or password" },
+  "common": { "save": "Save", "cancel": "Cancel", "add": "Add", "name": "Name", "nameBn": "Name (Bangla)", "status": "Status", "actions": "Actions", "yes": "Yes", "no": "No", "min": "min" }
+}

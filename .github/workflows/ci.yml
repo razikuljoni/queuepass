@@ -1,0 +1,45 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_DB: queuepass_test, POSTGRES_USER: queuepass_owner, POSTGRES_PASSWORD: ci }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U queuepass_owner" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://queuepass_app:ci@localhost:5432/queuepass_test
+      PUBLIC_DATABASE_URL: postgresql://queuepass_public:ci@localhost:5432/queuepass_test
+      MIGRATION_DATABASE_URL: postgresql://queuepass_owner:ci@localhost:5432/queuepass_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-test-secret
+      SMS_PROVIDER: dev
+      # The e2e fixtures run as the postgres bootstrap user (a superuser in
+      # this service container), because FORCE RLS applies to the owner role.
+      TEST_SUPERUSER_URL: postgresql://queuepass_owner:ci@localhost:5432/queuepass_test
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # Roles must exist before migrations; table grants need the tables.
+      - run: psql "postgresql://queuepass_owner:ci@localhost:5432/queuepass_test" -v owner_pass=ci -v app_pass=ci -v pub_pass=ci -f scripts/db-setup.sql
+      - run: pnpm --filter @queuepass/api prisma:migrate:deploy
+      - run: psql "postgresql://queuepass_owner:ci@localhost:5432/queuepass_test" -f scripts/db-grants.sql
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm test:e2e
+      - run: pnpm build
+      # Seed the test DB (superuser) so the Playwright smoke test has the demo branch.
+      - run: DATABASE_URL="postgresql://queuepass_owner:ci@localhost:5432/queuepass_test" pnpm db:seed
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm --filter @queuepass/web test:smoke

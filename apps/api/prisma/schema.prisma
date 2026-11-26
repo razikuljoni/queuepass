@@ -1,0 +1,312 @@
+// QueuePass — Prisma 6 schema. Postgres RLS policies live in the
+// `rls_and_grants` migration. Tenancy is enforced in two places: the app
+// (tenant from verified JWT, set_config per transaction) and the database
+// (RLS policies).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  owner
+  branch_manager
+  counter
+  viewer
+}
+
+enum CounterStatus {
+  open
+  break
+  closed
+}
+
+enum TokenStatus {
+  waiting
+  called
+  serving
+  completed
+  no_show
+  cancelled
+  expired
+}
+
+enum Priority {
+  normal
+  priority
+}
+
+enum TokenSource {
+  qr
+  sms
+  kiosk
+  staff
+  appointment
+}
+
+enum NotificationChannel {
+  sms
+  whatsapp
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+}
+
+enum AppointmentStatus {
+  booked
+  checked_in
+  completed
+  no_show
+  cancelled
+}
+
+model Organisation {
+  id               String   @id @default(cuid())
+  name             String
+  tradeLicence     String?
+  maskingSenderId  String?
+  smsBalanceBdt    Decimal  @default(0) @db.Decimal(10, 2)
+  plan             String   @default("pilot")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  branches         Branch[]
+  users            User[]
+  auditLogs        AuditLog[]
+
+  @@map("organisations")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  orgId        String
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  email        String       @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role         @default(viewer)
+  branchIds    String[]     @default([])
+  pinHash      String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  auditLogs    AuditLog[]
+
+  @@index([orgId])
+  @@map("users")
+}
+
+model Branch {
+  id           String       @id @default(cuid())
+  orgId        String
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name         String
+  nameBn       String?
+  address      String?
+  timezone     String       @default("Asia/Dhaka")
+  workingHours Json          @default("{}")
+  holidays     Json          @default("[]")
+  isOpen       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  services     Service[]
+  counters     Counter[]
+  tokens       Token[]
+  appointments Appointment[]
+  notifications Notification[]
+  auditLogs    AuditLog[]
+  dailyStats   DailyStats[]
+
+  @@index([orgId])
+  @@map("branches")
+}
+
+model Service {
+  id                  String   @id @default(cuid())
+  orgId               String
+  branchId            String
+  branch              Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  name                String
+  nameBn              String?
+  codePrefix          String   // e.g. "A"
+  configuredServiceMin Int     @default(5)
+  avgServiceMin       Float    @default(5)
+  serviceSamples      Int      @default(0)
+  capacityPerDay      Int      @default(100)
+  isOpen              Boolean  @default(true)
+  priorityRules       Json     @default("{}")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  counters            Counter[] @relation("CounterServices")
+  tokens              Token[]
+  appointments        Appointment[]
+  dailyStats          DailyStats[]
+
+  @@index([branchId])
+  @@index([orgId])
+  @@map("services")
+}
+
+model Counter {
+  id             String        @id @default(cuid())
+  orgId          String
+  branchId       String
+  branch         Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  name           String
+  status         CounterStatus @default(open)
+  currentTokenId String?
+  staffId        String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  services       Service[]     @relation("CounterServices")
+  tokens         Token[]
+
+  @@index([branchId])
+  @@index([orgId])
+  @@map("counters")
+}
+
+model Token {
+  id               String        @id @default(cuid())
+  orgId            String
+  branchId         String
+  branch           Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  serviceId        String
+  service          Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  counterId        String?
+  counter          Counter?      @relation(fields: [counterId], references: [id], onDelete: SetNull)
+  appointmentId    String?
+  appointment      Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  number           String        // e.g. "A-042"
+  seqNo            Int
+  phone            String
+  name             String?
+  status           TokenStatus   @default(waiting)
+  priority         Priority      @default(normal)
+  source           TokenSource   @default(qr)
+  publicCode       String        @unique // code for /t/:code, no auth
+  joinedAt         DateTime      @default(now())
+  calledAt         DateTime?
+  completedAt      DateTime?
+  noShowCount      Int           @default(0)
+  recallCount      Int           @default(0)
+  requeueCount     Int           @default(0)
+  predictedWaitMin Int?
+  actualWaitMin    Int?
+  cancelReason     String?
+  version          Int           @default(0)
+  idempotencyKey   String?       @unique
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+
+  @@unique([branchId, serviceId, seqNo, createdAt]) // number unique per branch/service/day enforced in code by date-scoped seq
+  @@index([branchId, serviceId, status, priority, createdAt])
+  @@index([branchId, status])
+  @@index([orgId])
+  @@map("tokens")
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  orgId       String
+  branchId    String
+  branch      Branch            @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  serviceId   String
+  service     Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  phone       String
+  name        String?
+  slotAt      DateTime
+  status      AppointmentStatus @default(booked)
+  tokenId     String?           @unique
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  tokens      Token[]
+
+  @@index([branchId, slotAt])
+  @@index([orgId])
+  @@map("appointments")
+}
+
+model Notification {
+  id            String             @id @default(cuid())
+  orgId         String
+  branchId      String
+  branch        Branch             @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  tokenId       String
+  token         Token              @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  event         String // joined | three_away | your_turn | recalled
+  channel       NotificationChannel @default(sms)
+  locale        String             @default("bn")
+  status        NotificationStatus @default(pending)
+  provider      String             @default("dev")
+  providerMsgId String?
+  costBdt       Decimal            @default(0) @db.Decimal(10, 2)
+  body          String             @default("")
+  attempts      Int                @default(0)
+  sentAt        DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@unique([tokenId, event])
+  @@index([status, createdAt])
+  @@index([branchId])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  orgId     String
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action    String
+  tokenId   String?
+  token     Token?   @relation(fields: [tokenId], references: [id], onDelete: SetNull)
+  details   Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([branchId, createdAt])
+  @@map("audit_logs")
+}
+
+model DailyStats {
+  id             String   @id @default(cuid())
+  orgId          String
+  branchId       String
+  branch         Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  serviceId      String?
+  service        Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  date           DateTime @db.Date
+  tokensIssued   Int      @default(0)
+  served         Int      @default(0)
+  noShow         Int      @default(0)
+  avgWaitMin     Float?
+  avgServiceMin  Float?
+  peakHour       Int?
+  createdAt      DateTime @default(now())
+
+  @@unique([branchId, serviceId, date])
+  @@index([orgId, date])
+  @@map("daily_stats")
+}
+
+model IdempotencyKey {
+  id        String   @id @default(cuid())
+  orgId     String
+  key       String
+  result    Json
+  createdAt DateTime @default(now())
+
+  @@unique([orgId, key])
+  @@map("idempotency_keys")
+}

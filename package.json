@@ -1,0 +1,20 @@
+{
+  "name": "queuepass",
+  "version": "0.1.0",
+  "private": true,
+  "description": "QueuePass — virtual queue management SaaS for Bangladesh. Local dev only.",
+  "packageManager": "pnpm@10.34.9",
+  "scripts": {
+    "dev": "pnpm --filter @queuepass/api --filter @queuepass/web --parallel dev",
+    "build": "pnpm -r build",
+    "test": "pnpm --filter @queuepass/api test",
+    "test:e2e": "pnpm --filter @queuepass/api test:e2e",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "pnpm --filter @queuepass/api prisma:migrate",
+    "db:seed": "pnpm --filter @queuepass/api prisma:seed",
+    "dev:api": "pnpm --filter @queuepass/api dev",
+    "dev:web": "pnpm --filter @queuepass/web dev"
+  },
+  "engines": { "node": ">=22" }
+}
